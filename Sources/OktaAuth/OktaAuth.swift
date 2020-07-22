@@ -131,7 +131,7 @@ final public class OktaAuth {
         - completion: returns a Result with `OktaCredentials` as its success type and `NetworkError` as its failure type.
      */
     
-    public func receiveCode(in url: URL, completion: @escaping (Result<OktaCredentials, NetworkError>) -> Void) {
+    public func receiveCredentials(fromCallbackURL url: URL, completion: @escaping (Result<OktaCredentials, NetworkError>) -> Void) {
         let components = URLComponents(string: url.absoluteString)
         
         guard let code = components?.queryItems?.filter({ $0.name == OAuthKeys.code.rawValue }).first?.value,
