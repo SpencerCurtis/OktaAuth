@@ -13,7 +13,7 @@ extension Notification.Name {
     static var receivedCode = Notification.Name("receivedCode")
 }
 
-final class OktaAuth {
+final public class OktaAuth {
     
     public static let shared = OktaAuth()
     
