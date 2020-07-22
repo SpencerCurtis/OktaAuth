@@ -228,7 +228,7 @@ final public class OktaAuth {
     }
     
     private func saveCurrentConfiguration() {
-        let configDictionary: [String: Any] = [PersistenceKeys.baseURL.rawValue: baseURL,
+        let configDictionary: [String: Any] = [PersistenceKeys.baseURL.rawValue: baseURL.absoluteString,
                                                PersistenceKeys.clientID.rawValue: clientID,
                                                PersistenceKeys.redirectURI.rawValue: redirectURI]
         
@@ -238,7 +238,10 @@ final public class OktaAuth {
     private func loadPreviousConfiguration() {
         guard let configDictionary = UserDefaults.standard.dictionary(forKey: PersistenceKeys.oktaAuth.rawValue) else { return }
         
-        _baseURL = configDictionary[PersistenceKeys.baseURL.rawValue] as? URL
+        if let baseURLString = configDictionary[PersistenceKeys.baseURL.rawValue] as? String {
+            _baseURL = URL(string: baseURLString)
+        }
+        
         clientID = configDictionary[PersistenceKeys.clientID.rawValue] as? String ?? ""
         redirectURI = configDictionary[PersistenceKeys.redirectURI.rawValue] as? String ?? ""
     }
