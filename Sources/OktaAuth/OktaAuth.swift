@@ -79,7 +79,6 @@ final public class OktaAuth {
     /// This method must be called first before using any other method in this class. Without calling this, your app will crash due to OktaAuth not having the necessary information to give you an access token.
     public func setUpConfiguration(baseURL: URL,
                                    clientID: String,
-                                   accessTokenURL: URL,
                                    redirectURI: String) {
         self.baseURL = baseURL
         self.clientID = clientID
