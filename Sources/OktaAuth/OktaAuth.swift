@@ -134,7 +134,7 @@ final public class OktaAuth {
         - completion: returns a Result with `Void` as its success type and `NetworkError` as its failure type. As the method sets the credentials in a property in this class for easier access in your app, the success type `Void` can be ignored. You should still however handle errors appropriately.
      */
     
-    public func receiveCredentials(fromCallbackURL url: URL, completion: @escaping (Result<Bool, NetworkError>) -> Void) {
+    public func receiveCredentials(fromCallbackURL url: URL, completion: @escaping (Result<Void, NetworkError>) -> Void) {
         let components = URLComponents(string: url.absoluteString)
         
         guard let code = components?.queryItems?.filter({ $0.name == OAuthKeys.code.rawValue }).first?.value,
@@ -198,7 +198,7 @@ final public class OktaAuth {
             do {
                 let credentials = try decoder.decode(OktaCredentials.self, from: data)
                 self.oktaCredentials = credentials
-                completion(.success(true))
+                completion(.success(Void()))
             } catch {
                 NSLog("Error decoding access token: \(error)")
                 completion(.failure(.noDecode))
