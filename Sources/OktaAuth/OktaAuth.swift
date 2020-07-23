@@ -60,6 +60,8 @@ final public class OktaAuth {
     
     private var hasBeenSetUp = false
     
+    public var oktaCredentials: OktaCredentials?
+    
     private let verifier: String = {
         var buffer = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, buffer.count, &buffer)
@@ -122,16 +124,17 @@ final public class OktaAuth {
     
     /**
      
-     This method should be called in the SceneDelegate's `scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>)` method. Assuming the authentication succeeds, the completion closure will provide you with an `OktaCredentials` instance. These credentials contain the access token that will allow you to access protected endpoints in your web backend.
+     This method should be called in the SceneDelegate's `scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>)` method. Assuming the authentication succeeds, you can then access the returned `OktaCredentials` in this class' `oktaCredentials` property. These credentials contain the access token that will allow you to access protected endpoints in your web backend.
      
      - precondition: You must have called `setUpConfiguration` before calling this method.
      
      - parameters:
         - url: The URL returned to you from one the SceneDelegate's [UIOpenURLContext](https://developer.apple.com/documentation/uikit/uiopenurlcontext?language=objc).
-        - completion: returns a Result with `OktaCredentials` as its success type and `NetworkError` as its failure type.
+     
+        - completion: returns a Result with `Void` as its success type and `NetworkError` as its failure type. As the method sets the credentials in a property in this class for easier access in your app, the success type `Void` can be ignored. You should still however handle errors appropriately.
      */
     
-    public func receiveCredentials(fromCallbackURL url: URL, completion: @escaping (Result<OktaCredentials, NetworkError>) -> Void) {
+    public func receiveCredentials(fromCallbackURL url: URL, completion: @escaping (Result<Bool, NetworkError>) -> Void) {
         let components = URLComponents(string: url.absoluteString)
         
         guard let code = components?.queryItems?.filter({ $0.name == OAuthKeys.code.rawValue }).first?.value,
@@ -145,11 +148,6 @@ final public class OktaAuth {
             return
         }
         
-        getAccessToken(for: code, completion: completion)
-    }
-    
-    private func getAccessToken(for code: String, completion: @escaping (Result<OktaCredentials, NetworkError>) -> Void = { _ in }) {
-        verifySetUp()
         let pairs = [(OAuthKeys.grantType.rawValue, "authorization_code"),
                      (OAuthKeys.clientID.rawValue, clientID),
                      (OAuthKeys.redirectURI.rawValue, redirectURI),
@@ -198,8 +196,9 @@ final public class OktaAuth {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             
             do {
-                let token = try decoder.decode(OktaCredentials.self, from: data)
-                completion(.success(token))
+                let credentials = try decoder.decode(OktaCredentials.self, from: data)
+                self.oktaCredentials = credentials
+                completion(.success(true))
             } catch {
                 NSLog("Error decoding access token: \(error)")
                 completion(.failure(.noDecode))
@@ -227,6 +226,10 @@ final public class OktaAuth {
             .trimmingCharacters(in: .whitespaces)
     }
     
+    // MARK: Configuration Persistence
+    
+    /// Saving the current configuration is necessary as the app may close in the background as the user is authenticating through Okta in a browser. This way, the configuration can be loaded up again and the authentication process can resume normally.
+    
     private func saveCurrentConfiguration() {
         let configDictionary: [String: Any] = [PersistenceKeys.baseURL.rawValue: baseURL.absoluteString,
                                                PersistenceKeys.clientID.rawValue: clientID,
@@ -238,14 +241,17 @@ final public class OktaAuth {
     private func loadPreviousConfiguration() {
         guard let configDictionary = UserDefaults.standard.dictionary(forKey: PersistenceKeys.oktaAuth.rawValue) else { return }
         
-        if let baseURLString = configDictionary[PersistenceKeys.baseURL.rawValue] as? String {
-            _baseURL = URL(string: baseURLString)
+        if let baseURLString = configDictionary[PersistenceKeys.baseURL.rawValue] as? String,
+            let baseURL = URL(string: baseURLString),
+            let clientID = configDictionary[PersistenceKeys.clientID.rawValue] as? String,
+            let redirectURI = configDictionary[PersistenceKeys.redirectURI.rawValue] as? String {
+            
+            self.baseURL = baseURL
+            self.clientID = clientID
+            self.redirectURI = redirectURI
+            hasBeenSetUp = true
         }
-        
-        clientID = configDictionary[PersistenceKeys.clientID.rawValue] as? String ?? ""
-        redirectURI = configDictionary[PersistenceKeys.redirectURI.rawValue] as? String ?? ""
     }
-    
     
     private func verifySetUp() {
         guard hasBeenSetUp else {
