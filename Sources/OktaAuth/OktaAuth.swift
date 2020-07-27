@@ -9,8 +9,10 @@
 import Foundation
 import CommonCrypto
 
+#warning("Implement checking the expiry of the token and remove it once expired")
+
 extension Notification.Name {
-    static var receivedCode = Notification.Name("receivedCode")
+    static let receivedCode = Notification.Name("receivedCode")
 }
 
 final public class OktaAuth {
@@ -43,6 +45,10 @@ final public class OktaAuth {
     public var accessTokenURL: URL {
         return baseURL
             .appendingPathComponent("/oauth2/default/v1/token")
+    }
+    
+    private var clientIDURL: URL {
+        return baseURL.appendingPathComponent("/v1/introspect")
     }
     
     /// Matches the Client ID of your Okta OAuth application that you created. You can find it at the bottom of your application's General tab in Okta.
@@ -129,9 +135,9 @@ final public class OktaAuth {
      - precondition: You must have called `setUpConfiguration` before calling this method.
      
      - parameters:
-        - url: The URL returned to you from one the SceneDelegate's [UIOpenURLContext](https://developer.apple.com/documentation/uikit/uiopenurlcontext?language=objc).
+     - url: The URL returned to you from one the SceneDelegate's [UIOpenURLContext](https://developer.apple.com/documentation/uikit/uiopenurlcontext?language=objc).
      
-        - completion: returns a Result with `Void` as its success type and `NetworkError` as its failure type. As the method sets the credentials in a property in this class for easier access in your app, the success type `Void` can be ignored. You should still however handle errors appropriately.
+     - completion: returns a Result with `Void` as its success type and `NetworkError` as its failure type. As the method sets the credentials in a property in this class for easier access in your app, the success type `Void` can be ignored. You should still however handle errors appropriately.
      */
     
     public func receiveCredentials(fromCallbackURL url: URL, completion: @escaping (Result<Void, NetworkError>) -> Void) {
@@ -196,7 +202,8 @@ final public class OktaAuth {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             
             do {
-                let credentials = try decoder.decode(OktaCredentials.self, from: data)
+                var credentials = try decoder.decode(OktaCredentials.self, from: data)
+                credentials.userID = try self.decode(jwtToken: credentials.accessToken)["uid"] as? String
                 self.oktaCredentials = credentials
                 completion(.success(Void()))
             } catch {
@@ -224,6 +231,34 @@ final public class OktaAuth {
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
             .trimmingCharacters(in: .whitespaces)
+    }
+    
+    func decode(jwtToken jwt: String) throws -> [String: Any] {
+        
+        enum DecodeErrors: Error {
+            case badToken
+            case other
+        }
+        
+        func base64Decode(_ base64: String) throws -> Data {
+            let padded = base64.padding(toLength: ((base64.count + 3) / 4) * 4, withPad: "=", startingAt: 0)
+            guard let decoded = Data(base64Encoded: padded) else {
+                throw DecodeErrors.badToken
+            }
+            return decoded
+        }
+        
+        func decodeJWTPart(_ value: String) throws -> [String: Any] {
+            let bodyData = try base64Decode(value)
+            let json = try JSONSerialization.jsonObject(with: bodyData, options: [])
+            guard let payload = json as? [String: Any] else {
+                throw DecodeErrors.other
+            }
+            return payload
+        }
+        
+        let segments = jwt.components(separatedBy: ".")
+        return try decodeJWTPart(segments[1])
     }
     
     // MARK: Configuration Persistence
@@ -255,7 +290,7 @@ final public class OktaAuth {
     
     private func verifySetUp() {
         guard hasBeenSetUp else {
-            fatalError("ERROR: Please call the `setUpConfiguration` method to supply the necessary information for your Okta authentication server before using anything else in this class.")
+            preconditionFailure("ERROR: Please call the `setUpConfiguration` method to supply the necessary information for your Okta authentication server before using anything else in this class.")
         }
     }
     
