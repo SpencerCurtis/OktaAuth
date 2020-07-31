@@ -9,31 +9,14 @@
 import Foundation
 import CommonCrypto
 
-#warning("Implement checking the expiry of the token and remove it once expired")
-
 extension Notification.Name {
     static let receivedCode = Notification.Name("receivedCode")
 }
 
 final public class OktaAuth {
     
-    public static let shared = OktaAuth()
-    
-    private var _baseURL: URL?
-    
     /// This should be the URL to your Okta authentication server. Ensure this has the "/authorize" endpoint as well. For example: https://yourAuthServer.okta.com
-    private var baseURL: URL {
-        get {
-            guard let baseURL = _baseURL else {
-                fatalError("Base URL is nil. Please call the `setUpConfiguration` method to provide the URL to your Okta authentication server")
-            }
-            return baseURL
-        }
-        
-        set {
-            _baseURL = newValue
-        }
-    }
+    private var baseURL: URL
     
     /// This adds the correct endpoints to the `baseURL` for the authorization of a user
     public var authURL: URL {
@@ -47,16 +30,12 @@ final public class OktaAuth {
             .appendingPathComponent("/oauth2/default/v1/token")
     }
     
-    private var clientIDURL: URL {
-        return baseURL.appendingPathComponent("/v1/introspect")
-    }
-    
     /// Matches the Client ID of your Okta OAuth application that you created. You can find it at the bottom of your application's General tab in Okta.
     /// Should look something like this: `0oacfa90iqbWwsV0R4x6`
-    private var clientID = ""
+    private var clientID: String
     
     /// This is the URL with a custom scheme that you set up when you created your Okta application. You can view your redirect URI(s) and add more in the application's General Settings under __Login redirect URIs__. See [this screenshot](https://tk-assets.lambdaschool.com/276caf96-fcd4-4ccc-80af-bb3ec46f9f0f_ScreenShot2020-07-16at4.38.27PM.png).
-    private var redirectURI = ""
+    private var redirectURI: String
     
     /// State is used to verify that the server we send the request to is the same one that gives us a response back.
     private var currentState: String = ""
@@ -66,7 +45,8 @@ final public class OktaAuth {
     
     private var hasBeenSetUp = false
     
-    public var oktaCredentials: OktaCredentials?
+    private var credentialExpiry: Date?
+    private var oktaCredentials: OktaCredentials?
     
     private let verifier: String = {
         var buffer = [UInt8](repeating: 0, count: 32)
@@ -80,38 +60,23 @@ final public class OktaAuth {
             .trimmingCharacters(in: .whitespaces)
     }()
     
-    
-    private init() {
-        loadPreviousConfiguration()
-    }
-    /// This method must be called first before using any other method in this class. Without calling this, your app will crash due to OktaAuth not having the necessary information to give you an access token.
-    public func setUpConfiguration(baseURL: URL,
-                                   clientID: String,
-                                   redirectURI: String) {
+    public init(baseURL: URL,
+         clientID: String,
+         redirectURI: String) {
+        
         self.baseURL = baseURL
         self.clientID = clientID
         self.redirectURI = redirectURI
-        
-        saveCurrentConfiguration()
-        self.hasBeenSetUp = true
     }
-    
-    
-    
     
     // MARK: - Authentication
     
     /**
-     
      This method returns a URL that you should pass into `UIApplication.shared.open` in order to open the user's browser to have them sign in.
-     
-     - precondition: You must have called `setUpConfiguration` before calling this method.
-     
      */
+    
     public func identityAuthURL() -> URL? {
-        
-        verifySetUp()
-        
+                
         guard let codeChallenge = createCodeChallenge() else { return nil }
         self.currentCodeChallenge = codeChallenge
         
@@ -131,9 +96,7 @@ final public class OktaAuth {
     /**
      
      This method should be called in the SceneDelegate's `scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>)` method. Assuming the authentication succeeds, you can then access the returned `OktaCredentials` in this class' `oktaCredentials` property. These credentials contain the access token that will allow you to access protected endpoints in your web backend.
-     
-     - precondition: You must have called `setUpConfiguration` before calling this method.
-     
+        
      - parameters:
      - url: The URL returned to you from one the SceneDelegate's [UIOpenURLContext](https://developer.apple.com/documentation/uikit/uiopenurlcontext?language=objc).
      
@@ -205,6 +168,7 @@ final public class OktaAuth {
                 var credentials = try decoder.decode(OktaCredentials.self, from: data)
                 credentials.userID = try self.decode(jwtToken: credentials.accessToken)["uid"] as? String
                 self.oktaCredentials = credentials
+                
                 completion(.success(Void()))
             } catch {
                 NSLog("Error decoding access token: \(error)")
@@ -212,6 +176,25 @@ final public class OktaAuth {
             }
         }.resume()
     }
+    
+    func credentialsIfAvailable() throws -> OktaCredentials {
+        guard let oktaCredentials = oktaCredentials else {
+            throw CredentialError.noCredentials
+        }
+        
+        if let credentialExpiry = credentialExpiry,
+            Date() > credentialExpiry {
+            throw CredentialError.expiredCredentials
+        }
+        
+        return oktaCredentials
+    }
+    
+    enum CredentialError: Error {
+        case noCredentials
+        case expiredCredentials
+    }
+    
     
     // MARK: - Private Methods
     
@@ -259,39 +242,6 @@ final public class OktaAuth {
         
         let segments = jwt.components(separatedBy: ".")
         return try decodeJWTPart(segments[1])
-    }
-    
-    // MARK: Configuration Persistence
-    
-    /// Saving the current configuration is necessary as the app may close in the background as the user is authenticating through Okta in a browser. This way, the configuration can be loaded up again and the authentication process can resume normally.
-    
-    private func saveCurrentConfiguration() {
-        let configDictionary: [String: Any] = [PersistenceKeys.baseURL.rawValue: baseURL.absoluteString,
-                                               PersistenceKeys.clientID.rawValue: clientID,
-                                               PersistenceKeys.redirectURI.rawValue: redirectURI]
-        
-        UserDefaults.standard.set(configDictionary, forKey: PersistenceKeys.oktaAuth.rawValue)
-    }
-    
-    private func loadPreviousConfiguration() {
-        guard let configDictionary = UserDefaults.standard.dictionary(forKey: PersistenceKeys.oktaAuth.rawValue) else { return }
-        
-        if let baseURLString = configDictionary[PersistenceKeys.baseURL.rawValue] as? String,
-            let baseURL = URL(string: baseURLString),
-            let clientID = configDictionary[PersistenceKeys.clientID.rawValue] as? String,
-            let redirectURI = configDictionary[PersistenceKeys.redirectURI.rawValue] as? String {
-            
-            self.baseURL = baseURL
-            self.clientID = clientID
-            self.redirectURI = redirectURI
-            hasBeenSetUp = true
-        }
-    }
-    
-    private func verifySetUp() {
-        guard hasBeenSetUp else {
-            preconditionFailure("ERROR: Please call the `setUpConfiguration` method to supply the necessary information for your Okta authentication server before using anything else in this class.")
-        }
     }
     
     // MARK: - Private enums
