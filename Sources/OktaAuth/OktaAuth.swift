@@ -42,9 +42,7 @@ final public class OktaAuth {
     
     private var currentCodeChallenge: String = ""
     private var code: String = ""
-    
-    private var hasBeenSetUp = false
-    
+        
     private var credentialExpiry: Date?
     private var oktaCredentials: OktaCredentials?
     
@@ -177,7 +175,7 @@ final public class OktaAuth {
         }.resume()
     }
     
-    func credentialsIfAvailable() throws -> OktaCredentials {
+    public func credentialsIfAvailable() throws -> OktaCredentials {
         guard let oktaCredentials = oktaCredentials else {
             throw CredentialError.noCredentials
         }
@@ -189,12 +187,6 @@ final public class OktaAuth {
         
         return oktaCredentials
     }
-    
-    enum CredentialError: Error {
-        case noCredentials
-        case expiredCredentials
-    }
-    
     
     // MARK: - Private Methods
     
@@ -216,7 +208,7 @@ final public class OktaAuth {
             .trimmingCharacters(in: .whitespaces)
     }
     
-    func decode(jwtToken jwt: String) throws -> [String: Any] {
+    private func decode(jwtToken jwt: String) throws -> [String: Any] {
         
         enum DecodeErrors: Error {
             case badToken
@@ -272,12 +264,5 @@ final public class OktaAuth {
         case contentType = "Content-Type"
         case authorization = "Authorization"
         case cacheControl = "cache-control"
-    }
-    
-    private enum PersistenceKeys: String {
-        case baseURL
-        case clientID
-        case redirectURI
-        case oktaAuth
     }
 }
