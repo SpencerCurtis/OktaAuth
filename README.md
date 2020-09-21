@@ -72,10 +72,10 @@ The `redirectURI` you passed into the `OktaAuth` initializer is what tells Okta 
 Your Xcode project must configure a custom URL scheme that matches the one that is set up in your apps Okta server. Reach out to ADD PERSON HERE if you need help figuring out what the custom scheme is for your Labs project.
  
 - To set this up:
- -  Navigate to the blue project file at the top of the file navigator
- -  Click on the "Info" tab at the top of the screen that appears. 
- -  Click the disclosure triangle on the "URL Types" section and click the plus (`+`) button that appears. This will add a new URL Type to fill out.
- -  Add the identifier with _your specific project's bundle identifier_. If you are using the sample project, make sure the bundle identifier is something unique for your Labs project in the general tab. For example: `com.LambdaSchool.Ecosoap25`, etc. Once you have made sure it isn't `com.LambdaSchool.LabsScaffolding` then you can put the same unique bundle identifier in this "Identifier" field.
+ 	-  Navigate to the blue project file at the top of the file navigator
+	-  Click on the "Info" tab at the top of the screen that appears. 
+ 	-  Click the disclosure triangle on the "URL Types" section and click the plus (`+`) button that appears. This will add a new URL Type to fill out.
+	-  Add the identifier with _your specific project's bundle identifier_. If you are using the sample project, make sure the bundle identifier is something unique for your Labs project in the general tab. For example: `com.LambdaSchool.Ecosoap25`, etc. Once you have made sure it isn't `com.LambdaSchool.LabsScaffolding` then you can put the same unique bundle identifier in this "Identifier" field.
 	-  In the "URL Schemes" field, add the custom URL scheme. This would be what was set up on the Okta application. In the example project it is `labs://` instead of `https://`. You should not add the `://` after the scheme name, but just the text itself.
 
 Here is an example of what the URL Type should look like when finished:
