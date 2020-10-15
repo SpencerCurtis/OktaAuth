@@ -69,7 +69,8 @@ let oktaAuth = OktaAuth(baseURL: URL(string: "https://yourAuthServer.okta.com/")
  
 The `redirectURI` you passed into the `OktaAuth` initializer is what tells Okta to open back up your application once the user has finished signing in successfully.
  
-Your Xcode project must configure a custom URL scheme that matches the one that is set up in your apps Okta server. Reach out to ADD PERSON HERE if you need help figuring out what the custom scheme is for your Labs project.
+Your Xcode project must configure a custom URL scheme that matches the one that is set up in your apps Okta server. Reach out to Ryan Hamblin
+if you need help figuring out what the custom scheme is for your Labs project (assuming you are a Lambda School Labs student).
  
 - To set this up:
  	-  Navigate to the blue project file at the top of the file navigator
